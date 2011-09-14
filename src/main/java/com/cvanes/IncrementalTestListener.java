@@ -1,6 +1,7 @@
 package com.cvanes;
 
 import java.io.IOException;
+import java.io.PrintStream;
 
 import javax.servlet.ServletException;
 
@@ -19,30 +20,9 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
+import hudson.tasks.junit.TestResultAction;
 
 public class IncrementalTestListener extends Recorder {
-	
-	@DataBoundConstructor
-	public IncrementalTestListener() {
-		// no config as of yet
-	}
-	
-	public BuildStepMonitor getRequiredMonitorService() {
-		return BuildStepMonitor.NONE;
-	}
-
-	@Override
-	public boolean perform(AbstractBuild<?, ?> build, 
-			Launcher launcher,
-			BuildListener listener) throws InterruptedException, IOException {
-		
-		ChangeLogSet<? extends Entry> changes = build.getChangeSet();
-		
-		if (changes.isEmptySet()) {
-			return false;
-		}
-		return true;
-	}
 	
     @Extension
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
@@ -61,5 +41,38 @@ public class IncrementalTestListener extends Recorder {
 		}
 
     }
+	
+	@DataBoundConstructor
+	public IncrementalTestListener() {
+		// no config as of yet
+	}
+	
+	public BuildStepMonitor getRequiredMonitorService() {
+		return BuildStepMonitor.NONE;
+	}
+
+	@Override
+	public boolean perform(AbstractBuild<?, ?> build, 
+			Launcher launcher,
+			BuildListener listener) throws InterruptedException, IOException {
+		
+		PrintStream logger = listener.getLogger();
+		
+		int total = 0;
+		TestResultAction testResults = (TestResultAction) build.getTestResultAction();
+		if (testResults != null) {
+			total = testResults.getTotalCount();
+			logger.println("Total tests : " + total);
+		} else {
+			logger.println("Naughty project with no unit tests");
+		}
+		
+		ChangeLogSet<? extends Entry> changes = build.getChangeSet();
+		// manual build with scm having been previously polled
+		if (changes.isEmptySet()) {
+			return true;
+		}
+		return true;
+	}
 
 }
