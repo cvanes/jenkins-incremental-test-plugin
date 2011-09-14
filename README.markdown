@@ -13,3 +13,7 @@ Enable or disable from a jobs configuration.
 * Create a view to allow showing why the build has failed.
 * Allow naming and shaming committers who don't add tests.
 * Unit tests for the plugin :)
+
+## Licence
+
+MIT Licence
