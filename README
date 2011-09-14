@@ -8,8 +8,8 @@ Enable or disable from a jobs configuration.
 To Do
 =====
 
-*Add an excludes list to avoid breaking the build for configuration updates.
+*Add an excludes list to avoid breaking the build for configuration updates or untestable code.
 *Allow resetting of the plugin status.
-*Create a view to show more information about build failures.
+*Create a view to allow showing why the build has failed.
 *Allow naming and shaming committers who don't add tests.
 *Unit tests for the plugin :)
