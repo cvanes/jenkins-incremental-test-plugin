@@ -1,0 +1,1 @@
+A Jenkins plugin to allow breaking a build when no new tests are added between commits.
