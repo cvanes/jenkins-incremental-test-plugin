@@ -1,0 +1,6 @@
+<!--
+  This view is used to render the installed plugins page.
+-->
+<div>
+  A simple plugin to break the build if no new unit tests have been added since the last commit.
+</div>
