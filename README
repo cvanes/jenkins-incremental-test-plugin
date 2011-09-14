@@ -1,4 +1,4 @@
-A Jenkins plugin to allow breaking a build when no new tests are added between commits - mainly aimed at existing projects where committers are slacking off when it comes to tests.
+A Jenkins plugin to allow breaking a build when no new tests have been added between commits - mainly aimed at existing projects where committers are slacking off when it comes to tests.
 
 Using
 =====
