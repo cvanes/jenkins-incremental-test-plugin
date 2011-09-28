@@ -25,7 +25,7 @@ public class IncrementalTestListenerTest {
 
     @Before
     public void setUp() throws Exception {
-        testListener = new IncrementalTestListener("");
+        testListener = new IncrementalTestListener(null, null);
     }
 
     @Test
@@ -33,5 +33,10 @@ public class IncrementalTestListenerTest {
 //        Mockito.when(build.getPreviousSuccessfulBuild()).thenReturn(previousBuild);
 //        Mockito.when(build.getTestResultAction()).thenReturn(testResults);
 //        testListener.perform(build, launcher, listener);
+    }
+
+    @Test
+    public void shouldTest() throws Exception {
+
     }
 }

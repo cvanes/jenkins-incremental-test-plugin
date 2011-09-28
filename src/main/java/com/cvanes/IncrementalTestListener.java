@@ -6,24 +6,31 @@ import hudson.model.BuildListener;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.scm.ChangeLogSet;
+import hudson.scm.ChangeLogSet.AffectedFile;
 import hudson.scm.ChangeLogSet.Entry;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
-import hudson.tasks.junit.TestResultAction;
+import hudson.tasks.test.AbstractTestResultAction;
 
 import java.io.IOException;
 import java.io.PrintStream;
 
+import net.sf.json.JSONObject;
+
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.StaplerRequest;
 
 /**
- * This plugin assumes that the project has at least one unit test.
+ * A simple plugin to fail the build if no new unit tests
+ * have been added since the last successful build.
  */
 public class IncrementalTestListener extends Recorder {
 
     private final String includes;
+
+    private final String excludes;
 
     @Extension
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
@@ -37,20 +44,38 @@ public class IncrementalTestListener extends Recorder {
             return "/plugin/incremental-test-plugin/help.html";
         }
 
+        @SuppressWarnings("rawtypes")
         @Override
         public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
 
+        @Override
+        public IncrementalTestListener newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+            return req.bindJSON(IncrementalTestListener.class,formData);
+        }
     }
+
+    /*
+     * Data bound from configuration screen.
+     */
+
+    @DataBoundConstructor
+    public IncrementalTestListener(String includes, String excludes) {
+        this.includes = includes;
+        this.excludes = excludes;
+    }
+
+    /*
+     * Getters needed to show persisted data in job config.
+     */
 
     public String getIncludes() {
         return includes;
     }
 
-    @DataBoundConstructor
-    public IncrementalTestListener(String includes) {
-        this.includes = includes;
+    public String getExcludes() {
+        return excludes;
     }
 
     public BuildStepMonitor getRequiredMonitorService() {
@@ -66,27 +91,28 @@ public class IncrementalTestListener extends Recorder {
 
         int lastCount = 0;
         int count = 0;
-        TestResultAction previousTestResults = (TestResultAction) build.getPreviousSuccessfulBuild().getTestResultAction();
-        TestResultAction testResults = (TestResultAction) build.getTestResultAction();
-        if (previousTestResults != null) {
-            lastCount = previousTestResults.getTotalCount();
-            logger.println("Total number of tests from last successful build : " + lastCount);
-        }
-        if (testResults != null) {
-            count = testResults.getTotalCount();
-            logger.println("Total number of tests : " + count);
-        } else {
-            logger.println("No unit tests found");
-        }
 
-        ChangeLogSet<? extends Entry> changes = build.getChangeSet();
-        if (shouldCheckTestStatusFor(logger, changes)) {
-            if (count - lastCount > 0) {
-                // we have new tests!!!
-                return true;
+        AbstractBuild<?, ?> previousBuild = build.getPreviousSuccessfulBuild();
+        if (previousBuild != null) {
+            AbstractTestResultAction<?> previousTestResults = build.getPreviousSuccessfulBuild().getTestResultAction();
+            AbstractTestResultAction<?> testResults = build.getTestResultAction();
+            if (previousTestResults != null) {
+                lastCount = previousTestResults.getTotalCount();
             }
-            // we have no new tests
-            return false;
+            if (testResults != null) {
+                count = testResults.getTotalCount();
+            }
+
+            if (shouldCheckTestStatusFor(build)) {
+                if (count - lastCount > 0) {
+                    // we have new tests!!!
+                    return true;
+                }
+                // we have no new tests
+                logger.println("No new unit tests added since last successful build and changes" +
+                		" have been detected from SCM, failing build");
+                return false;
+            }
         }
 
         return true;
@@ -97,19 +123,32 @@ public class IncrementalTestListener extends Recorder {
      * not when they're deleted. We also want to check the includes and excludes
      * lists.
      *
-     * @param logger
-     * @param changes
+     * @param build
      * @return
+     * @throws InterruptedException
+     * @throws IOException
      */
-    private boolean shouldCheckTestStatusFor(PrintStream logger, ChangeLogSet<? extends Entry> changes) {
-        if (!changes.isEmptySet()) {
-//            for (Entry entry : changes) {
-//                for (AffectedFile file : entry.getAffectedFiles()) {
-//                    String path = file.getPath();
-//                    logger.println(path);
-//                }
-//            }
-            return true;
+    private boolean shouldCheckTestStatusFor(AbstractBuild<?, ?> build) throws IOException, InterruptedException {
+        ChangeLogSet<? extends Entry> commits = build.getChangeSet();
+        String[] workspaceFiles = build.getWorkspace().act(new WorkspaceLister(includes, excludes));
+        if (!commits.isEmptySet()) {
+            for (Entry commit : commits) {
+                if (shouldCheckTestStatusFor(commit, workspaceFiles)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean shouldCheckTestStatusFor(Entry commit, String[] workspaceFiles) {
+        for (AffectedFile affectedFile : commit.getAffectedFiles()) {
+            String affectedFilePath = affectedFile.getPath();
+            for (String workspaceFilePath : workspaceFiles) {
+                if (affectedFilePath.endsWith(workspaceFilePath)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
